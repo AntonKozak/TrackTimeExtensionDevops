@@ -1,0 +1,55 @@
+{
+  "manifestVersion": 1,
+  "id": "time-tracking-calendar-extension",
+  "publisher": "AntonTimerTracker",
+  "version": "1.0.13",
+  "name": "TimerTracker",
+  "description": "Track events and more.",
+  "public": false,
+  "categories": ["Azure Boards"],
+  "targets": [
+    {
+      "id": "Microsoft.VisualStudio.Services"
+    }
+  ],
+  "scopes": ["vso.work_write"],
+  "icons": {
+    "default": "static/v2-images/appclock.png"
+  },
+  "content": {
+    "details": {
+      "path": "overview.md"
+    }
+  },
+  "files": [
+    {
+      "path": "static",
+      "addressable": true
+    },
+    {
+      "path": "dist",
+      "addressable": true
+    },
+    {
+      "path": "node_modules/moment/min",
+      "addressable": true,
+      "packagePath": "lib/moment"
+    }
+  ],
+  "branding": {
+    "color": "rgb(149, 37, 0)",
+    "theme": "dark"
+  },
+  "contributions": [
+    {
+      "id": "new-id-for-control",
+      "type": "ms.vss-web.hub",
+      "targets": ["ms.vss-work-web.work-hub-group"],
+      "properties": {
+        "name": "TimerTrackerExtension",
+        "order": 22,
+        "uri": "dist/calendar.html"
+      }
+    }
+  ]
+}
