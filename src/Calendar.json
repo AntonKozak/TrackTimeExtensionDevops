@@ -1,7 +1,7 @@
 {
   "contributions": [
     {
-      "id": "team-calendar",
+      "id": "time-tracker-extension",
       "type": "ms.vss-web.hub",
       "description": "Calendar hub in the Boards hub group.",
       "targets": ["ms.vss-work-web.work-hub-group"],

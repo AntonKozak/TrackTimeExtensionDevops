@@ -2,8 +2,8 @@
   "manifestVersion": 1,
   "id": "time-tracking-calendar-extension",
   "publisher": "AntonTimerTracker",
-  "version": "1.0.13",
-  "name": "TimerTracker",
+  "version": "1.0.0",
+  "name": "Time Tracker",
   "description": "Track events and more.",
   "public": false,
   "categories": ["Azure Boards"],
@@ -29,11 +29,6 @@
     {
       "path": "dist",
       "addressable": true
-    },
-    {
-      "path": "node_modules/moment/min",
-      "addressable": true,
-      "packagePath": "lib/moment"
     }
   ],
   "branding": {
@@ -46,8 +41,8 @@
       "type": "ms.vss-web.hub",
       "targets": ["ms.vss-work-web.work-hub-group"],
       "properties": {
-        "name": "TimerTrackerExtension",
-        "order": 22,
+        "name": "Timer Tracker",
+        "order": 25,
         "uri": "dist/calendar.html"
       }
     }
