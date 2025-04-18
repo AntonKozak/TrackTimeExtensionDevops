@@ -13,8 +13,8 @@
       ],
       "properties": {
         "iconName": "Calendar",
-        "name": "DHCalendar",
-        "order": 22,
+        "name": "Time",
+        "order": 25,
         "uri": "dist/calendar.html"
       },
       "constraints": [

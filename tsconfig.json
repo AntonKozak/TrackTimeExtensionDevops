@@ -11,7 +11,7 @@
     "sourceMap": true,
     "outDir": "dist/",
     "jsx": "react",
-    "lib": ["es5", "es6", "dom", "es2015.promise"],
+    "lib": ["dom", "es2017"],
     "types": ["react"],
     "noEmit": false,
     "baseUrl": ".",
