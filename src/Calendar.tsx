@@ -1,3 +1,4 @@
+// No changes here
 import React, { useEffect, useState } from "react";
 import * as ReactDOM from "react-dom";
 import "./Calendar.scss";
@@ -79,7 +80,6 @@ const ExtensionContent: React.FC = () => {
                 const projectNames = await service.getAllProjectNames();
 
                 const tasksAcrossProjects = await Promise.all(projectNames.map((project: any) => service.getAllTasksFromProject(project)));
-
                 const flattenedTasks = tasksAcrossProjects.flat();
 
                 setProjectTasks(currentProjectTasks);
@@ -99,7 +99,7 @@ const ExtensionContent: React.FC = () => {
             name: "ID",
             renderCell: (rowIndex, columnIndex, tableColumn, item) => (
                 <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
-                    {item?.id || "N/A"}
+                    {item?.id ?? "N/A"}
                 </SimpleTableCell>
             ),
             width: new ObservableValue(80)
@@ -156,6 +156,58 @@ const ExtensionContent: React.FC = () => {
                 );
             },
             width: new ObservableValue(120)
+        },
+        {
+            id: "storyPoints",
+            name: "Story Points",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => {
+                const value = item?.fields?.["Microsoft.VSTS.Scheduling.StoryPoints"];
+                return (
+                    <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                        {value !== undefined ? value : "Not set"}
+                    </SimpleTableCell>
+                );
+            },
+            width: new ObservableValue(100)
+        },
+        {
+            id: "originalEstimate",
+            name: "Original Estimate",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => {
+                const value = item?.fields?.["Microsoft.VSTS.Scheduling.OriginalEstimate"];
+                return (
+                    <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                        {value ?? 0}
+                    </SimpleTableCell>
+                );
+            },
+            width: new ObservableValue(120)
+        },
+        {
+            id: "remainingWork",
+            name: "Remaining Work",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => {
+                const value = item?.fields?.["Microsoft.VSTS.Scheduling.RemainingWork"];
+                return (
+                    <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                        {value ?? 0}
+                    </SimpleTableCell>
+                );
+            },
+            width: new ObservableValue(120)
+        },
+        {
+            id: "completedWork",
+            name: "Completed Work",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => {
+                const value = item?.fields?.["Microsoft.VSTS.Scheduling.CompletedWork"];
+                return (
+                    <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                        {value ?? 0}
+                    </SimpleTableCell>
+                );
+            },
+            width: new ObservableValue(120)
         }
     ];
 
@@ -176,7 +228,7 @@ const ExtensionContent: React.FC = () => {
                     <Table columns={columns} itemProvider={new ArrayItemProvider<any>(projectTasks)} role="table" />
                 )}
 
-                <h2 style={{ marginTop: "2rem" }}>All Projects Tasks</h2>
+                <h2 style={{ marginTop: "2rem" }}>All Project Tasks</h2>
                 {allTasks.length === 0 ? (
                     <p>Loading all tasks...</p>
                 ) : (

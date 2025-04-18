@@ -15,14 +15,11 @@ export class AzureDevOpsService {
         if (!project || !project.name) {
             throw new Error("Project not found");
         }
-
         console.log(`getProjectName() Project name: ${project.name}`);
         return project.name;
     }
 
     private async getAllUsersInProject(): Promise<GraphUser[]> {
-        const projectName = await this.getProjectName();
-
         const url = `https://vssps.dev.azure.com/${AzureDevOpsService.organization}/_apis/graph/users?api-version=7.1-preview.1`;
 
         try {
@@ -39,7 +36,7 @@ export class AzureDevOpsService {
             }
 
             const data = await response.json();
-            console.log(`getAllUsersInProject() Fetched ${data.count} users for project: ${projectName}`);
+            console.log(`getAllUsersInProject() Fetched ${data.count} users for project: ${AzureDevOpsService.organization}`);
             return data.value;
         } catch (error) {
             console.error("Error fetching users:", error);
@@ -61,7 +58,11 @@ export class AzureDevOpsService {
 
         const wiql: Wiql = {
             query: `
-                SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], [Microsoft.VSTS.Scheduling.StoryPoints]
+                SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], 
+                       [Microsoft.VSTS.Scheduling.StoryPoints],
+                       [Microsoft.VSTS.Scheduling.OriginalEstimate],
+                       [Microsoft.VSTS.Scheduling.RemainingWork],
+                       [Microsoft.VSTS.Scheduling.CompletedWork]
                 FROM WorkItems
                 WHERE [System.TeamProject] = '${projectName}'
                   AND [System.WorkItemType] = 'Task'
@@ -78,7 +79,6 @@ export class AzureDevOpsService {
         }
 
         const ids = result.workItems.map((wi) => wi.id!);
-
         const workItems = await workItemClient.getWorkItems(ids, undefined, undefined, undefined, WorkItemExpand.Fields);
         workItems.forEach((task) => {
             const taskDetails = {
@@ -86,12 +86,22 @@ export class AzureDevOpsService {
                 Title: task.fields["System.Title"],
                 AssignedTo: task.fields["System.AssignedTo"]?.displayName || "Unassigned",
                 State: task.fields["System.State"],
-                StoryPoints: task.fields["Microsoft.VSTS.Scheduling.StoryPoints"] || "Not set"
+                StoryPoints: task.fields["Microsoft.VSTS.Scheduling.StoryPoints"] ?? "Not set",
+                OriginalEstimate: task.fields["Microsoft.VSTS.Scheduling.OriginalEstimate"] ?? 0,
+                RemainingWork: task.fields["Microsoft.VSTS.Scheduling.RemainingWork"] ?? 0,
+                CompletedWork: task.fields["Microsoft.VSTS.Scheduling.CompletedWork"] ?? 0
             };
-
-            console.log(taskDetails);
+            console.log(
+                taskDetails.Id,
+                taskDetails.Title,
+                taskDetails.AssignedTo,
+                taskDetails.State,
+                taskDetails.StoryPoints,
+                taskDetails.OriginalEstimate,
+                taskDetails.RemainingWork,
+                taskDetails.CompletedWork
+            );
         });
-
         return workItems;
     }
     //#endregion
@@ -126,8 +136,7 @@ export class AzureDevOpsService {
                 }))
             };
 
-            console.log(`Fetched ${dataDetails} projects.`);
-
+            console.log(`Fetched ${dataDetails.value} projects.`);
             return data.value.map((project: any) => project.name);
         } catch (error) {
             console.error("Error fetching projects:", error);
@@ -139,7 +148,11 @@ export class AzureDevOpsService {
         try {
             const wiql: Wiql = {
                 query: `
-                    SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], [Microsoft.VSTS.Scheduling.StoryPoints]
+                    SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], 
+                           [Microsoft.VSTS.Scheduling.StoryPoints],
+                           [Microsoft.VSTS.Scheduling.OriginalEstimate],
+                           [Microsoft.VSTS.Scheduling.RemainingWork],
+                           [Microsoft.VSTS.Scheduling.CompletedWork]
                     FROM WorkItems
                     WHERE [System.TeamProject] = '${projectName}'
                       AND [System.WorkItemType] = 'Task'
@@ -150,25 +163,33 @@ export class AzureDevOpsService {
             const result = await workItemClient.queryByWiql(wiql);
 
             if (!result.workItems || result.workItems.length === 0) {
-                console.log(`No tasks found for project: ${projectName}`);
                 return [];
             }
 
             const ids = result.workItems.map((wi) => wi.id!);
-            console.log(`Found ${ids} task(s) in project: ${projectName}`);
-
             const workItems = await workItemClient.getWorkItems(ids, undefined, undefined, undefined, WorkItemExpand.Fields);
 
             workItems.forEach((task) => {
-                const taskDetails = {
+                const DetailedTask = {
                     Id: task.id,
                     Title: task.fields["System.Title"],
                     AssignedTo: task.fields["System.AssignedTo"]?.displayName || "Unassigned",
                     State: task.fields["System.State"],
-                    StoryPoints: task.fields["Microsoft.VSTS.Scheduling.StoryPoints"] || "Not set"
+                    StoryPoints: task.fields["Microsoft.VSTS.Scheduling.StoryPoints"] ?? "Not set",
+                    OriginalEstimate: task.fields["Microsoft.VSTS.Scheduling.OriginalEstimate"] ?? 0,
+                    RemainingWork: task.fields["Microsoft.VSTS.Scheduling.RemainingWork"] ?? 0,
+                    CompletedWork: task.fields["Microsoft.VSTS.Scheduling.CompletedWork"] ?? 0
                 };
-
-                console.log(taskDetails);
+                console.log(
+                    DetailedTask.Id,
+                    DetailedTask.Title,
+                    DetailedTask.AssignedTo,
+                    DetailedTask.State,
+                    DetailedTask.StoryPoints,
+                    DetailedTask.OriginalEstimate,
+                    DetailedTask.RemainingWork,
+                    DetailedTask.CompletedWork
+                );
             });
 
             return workItems;
@@ -188,8 +209,7 @@ azureService
 
         const taskPromises = projectNames.map((project: any) => azureService.getAllTasksFromProject(project));
 
-        const results = await Promise.all(taskPromises);
-        const allTasks = results.flat();
+        const allTasks = (await Promise.all(taskPromises)).flat();
 
         console.log("All Tasks from All Projects:", allTasks);
     })
@@ -200,8 +220,8 @@ azureService
 azureService
     .getTasksForUsers()
     .then((tasks) => {
-        console.log("Tasks:", tasks);
+        console.log("Tasks for users in current project:", tasks);
     })
     .catch((error) => {
-        console.error("Error fetching tasks:", error);
+        console.error("Error fetching user tasks:", error);
     });
