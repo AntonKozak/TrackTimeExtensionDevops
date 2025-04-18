@@ -17,13 +17,16 @@ const ExtensionContent: React.FC = () => {
     const [teams, setTeams] = useState<WebApiTeam[]>([]);
     const [selectedTeamName, setSelectedTeamName] = useState<string>("Select Team");
     const [error, setError] = useState<string | null>(null);
-    const [tasks, setTasks] = useState<any[]>([]);
+    const [projectTasks, setProjectTasks] = useState<any[]>([]);
+    const [allTasks, setAllTasks] = useState<any[]>([]);
 
     useEffect(() => {
         SDK.init();
+
         const initialize = async () => {
             try {
                 await SDK.ready();
+
                 const [dataSvc, projectService, locationService, navigationService] = await Promise.all([
                     SDK.getService<IExtensionDataService>(CommonServiceIds.ExtensionDataService),
                     SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService),
@@ -34,26 +37,17 @@ const ExtensionContent: React.FC = () => {
                 const project = await projectService.getProject();
                 if (!project) throw new Error("Project not found");
 
-                let selectedTeamId: string | undefined;
-                const queryParams = await navigationService.getQueryParams();
-                if (queryParams?.["team"]) {
-                    selectedTeamId = queryParams["team"];
-                }
-
                 const accessToken = await SDK.getAccessToken();
                 const dataManager: IExtensionDataManager = await dataSvc.getExtensionDataManager(SDK.getExtensionContext().id, accessToken);
-
                 const client = getClient(CoreRestClient);
 
-                if (!selectedTeamId) {
-                    selectedTeamId = await dataManager.getValue<string>("selected-team-" + project.id, {
-                        scopeType: "User"
-                    });
-                }
+                const queryParams = await navigationService.getQueryParams();
+                let selectedTeamId =
+                    queryParams?.["team"] || (await dataManager.getValue<string>("selected-team-" + project.id, { scopeType: "User" }));
 
                 const allTeams: WebApiTeam[] = [];
-                let fetchCount = 1000;
                 let skip = 0;
+                const fetchCount = 1000;
                 let batch: WebApiTeam[];
 
                 do {
@@ -73,18 +67,23 @@ const ExtensionContent: React.FC = () => {
                 }
 
                 if (selectedTeamId) {
-                    try {
-                        const selectedTeam = await client.getTeam(project.id, selectedTeamId);
-                        setSelectedTeamName(selectedTeam.name);
-                    } catch (err) {
-                        console.error("Could not load selected team:", err);
-                        setError("Could not load selected team");
-                    }
-
+                    const selectedTeam = await client.getTeam(project.id, selectedTeamId);
+                    setSelectedTeamName(selectedTeam.name);
                     await dataManager.setValue<string>("selected-team-" + project.id, selectedTeamId, { scopeType: "User" });
                 }
 
                 setTeams(allTeams);
+
+                const service = new AzureDevOpsService();
+                const currentProjectTasks = await service.getTasksForUsers();
+                const projectNames = await service.getAllProjectNames();
+
+                const tasksAcrossProjects = await Promise.all(projectNames.map((project: any) => service.getAllTasksFromProject(project)));
+
+                const flattenedTasks = tasksAcrossProjects.flat();
+
+                setProjectTasks(currentProjectTasks);
+                setAllTasks(flattenedTasks);
             } catch (err: any) {
                 console.error("Initialization error:", err);
                 setError(err?.message || "Unknown error during initialization");
@@ -94,43 +93,13 @@ const ExtensionContent: React.FC = () => {
         initialize();
     }, []);
 
-    // useEffect(() => {
-    //     const loadTasks = async () => {
-    //         const service = new AzureDevOpsService();
-    //         try {
-    //             const loadedTasks = await service.getAllActiveTasksAcrossProjects();
-    //             setTasks(loadedTasks);
-    //         } catch (err: any) {
-    //             console.error("Error loading tasks", err);
-    //             setError(err?.message || "Failed to load tasks.");
-    //         }
-    //     };
-
-    //     loadTasks();
-    // }, []);
-
-    useEffect(() => {
-        const loadTasks = async () => {
-            const service = new AzureDevOpsService();
-            try {
-                const loadedTasks = await service.getTasksForUsers();
-                setTasks(loadedTasks);
-            } catch (err: any) {
-                console.error("Error loading tasks", err);
-                setError(err?.message || "Failed to load tasks.");
-            }
-        };
-
-        loadTasks();
-    }, []);
-
     const columns: ITableColumn<any>[] = [
         {
             id: "id",
             name: "ID",
             renderCell: (rowIndex, columnIndex, tableColumn, item) => (
                 <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
-                    {item.id}
+                    {item?.id || "N/A"}
                 </SimpleTableCell>
             ),
             width: new ObservableValue(80)
@@ -138,19 +107,22 @@ const ExtensionContent: React.FC = () => {
         {
             id: "title",
             name: "Title",
-            renderCell: (rowIndex, columnIndex, tableColumn, item) => (
-                <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
-                    {item.fields?.["System.Title"] || "Untitled"}
-                </SimpleTableCell>
-            ),
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => {
+                const title = item?.fields?.["System.Title"] || "Untitled";
+                return (
+                    <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                        {title}
+                    </SimpleTableCell>
+                );
+            },
             width: new ObservableValue(300)
         },
         {
             id: "assignedTo",
             name: "Assigned To",
             renderCell: (rowIndex, columnIndex, tableColumn, item) => {
-                const assigned = item.fields?.["System.AssignedTo"];
-                const displayName = assigned?.displayName || "Unassigned";
+                const assignedTo = item?.fields?.["System.AssignedTo"];
+                const displayName = assignedTo?.displayName || "Unassigned";
                 return (
                     <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
                         {displayName}
@@ -158,6 +130,32 @@ const ExtensionContent: React.FC = () => {
                 );
             },
             width: new ObservableValue(200)
+        },
+        {
+            id: "state",
+            name: "State",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => {
+                const state = item?.fields?.["System.State"] || "Unknown";
+                return (
+                    <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                        {state}
+                    </SimpleTableCell>
+                );
+            },
+            width: new ObservableValue(120)
+        },
+        {
+            id: "type",
+            name: "Type",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => {
+                const workItemType = item?.fields?.["System.WorkItemType"] || "N/A";
+                return (
+                    <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                        {workItemType}
+                    </SimpleTableCell>
+                );
+            },
+            width: new ObservableValue(120)
         }
     ];
 
@@ -168,12 +166,21 @@ const ExtensionContent: React.FC = () => {
                 <p>
                     Selected Team: <strong>{selectedTeamName}</strong>
                 </p>
+
                 {error && <div style={{ color: "red" }}>Error: {error}</div>}
 
-                {tasks.length > 0 ? (
-                    <Table columns={columns} itemProvider={new ArrayItemProvider<any>(tasks)} role="table" />
+                <h2>Current Project Tasks</h2>
+                {projectTasks.length === 0 ? (
+                    <p>Loading current project tasks...</p>
                 ) : (
-                    <p>Loading tasks...</p>
+                    <Table columns={columns} itemProvider={new ArrayItemProvider<any>(projectTasks)} role="table" />
+                )}
+
+                <h2 style={{ marginTop: "2rem" }}>All Projects Tasks</h2>
+                {allTasks.length === 0 ? (
+                    <p>Loading all tasks...</p>
+                ) : (
+                    <Table columns={columns} itemProvider={new ArrayItemProvider<any>(allTasks)} role="table" />
                 )}
             </div>
         </Page>

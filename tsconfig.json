@@ -11,7 +11,7 @@
     "sourceMap": true,
     "outDir": "dist/",
     "jsx": "react",
-    "lib": ["dom", "es2017"],
+    "lib": ["dom", "ES2019"],
     "types": ["react"],
     "noEmit": false,
     "baseUrl": ".",
