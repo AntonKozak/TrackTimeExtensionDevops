@@ -1,4 +1,3 @@
-// No changes here
 import React, { useEffect, useState } from "react";
 import * as ReactDOM from "react-dom";
 import "./Calendar.scss";
@@ -20,6 +19,9 @@ const ExtensionContent: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [projectTasks, setProjectTasks] = useState<any[]>([]);
     const [allTasks, setAllTasks] = useState<any[]>([]);
+    const [iterations, setIterations] = useState<any[]>([]);
+    const [iterationTasks, setIterationTasks] = useState<Record<string, any[]>>({});
+    const [loadingIterations, setLoadingIterations] = useState<boolean>(false);
 
     useEffect(() => {
         SDK.init();
@@ -84,6 +86,22 @@ const ExtensionContent: React.FC = () => {
 
                 setProjectTasks(currentProjectTasks);
                 setAllTasks(flattenedTasks);
+
+                // Fetch iterations and their tasks
+                setLoadingIterations(true);
+                const projectName = project.name;
+                const teamName = selectedTeamName !== "Select Team" ? selectedTeamName : allTeams[0]?.name || "";
+                if (projectName && teamName) {
+                    const its = await service.getTeamIterations(projectName, teamName);
+                    setIterations(its);
+                    const tasksByIteration: Record<string, any[]> = {};
+                    for (const it of its) {
+                        const tasks = await service.getTasksForIteration(projectName, teamName, it.path);
+                        tasksByIteration[it.id] = tasks;
+                    }
+                    setIterationTasks(tasksByIteration);
+                }
+                setLoadingIterations(false);
             } catch (err: any) {
                 console.error("Initialization error:", err);
                 setError(err?.message || "Unknown error during initialization");
@@ -104,6 +122,20 @@ const ExtensionContent: React.FC = () => {
             ),
             width: new ObservableValue(80)
         },
+        {
+            id: "projectName",
+            name: "Project Name",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => {
+                const projectName = item?.fields?.["System.TeamProject"] || "Unknown";
+                return (
+                    <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                        {projectName}
+                    </SimpleTableCell>
+                );
+            },
+            width: new ObservableValue(200)
+        },
+
         {
             id: "title",
             name: "Title",
@@ -171,6 +203,19 @@ const ExtensionContent: React.FC = () => {
             width: new ObservableValue(100)
         },
         {
+            id: "effort",
+            name: "Effort",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => {
+                const value = item?.fields?.["Microsoft.VSTS.Scheduling.Effort"];
+                return (
+                    <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                        {value !== undefined ? value : "Not set"}
+                    </SimpleTableCell>
+                );
+            },
+            width: new ObservableValue(100)
+        },
+        {
             id: "originalEstimate",
             name: "Original Estimate",
             renderCell: (rowIndex, columnIndex, tableColumn, item) => {
@@ -208,6 +253,76 @@ const ExtensionContent: React.FC = () => {
                 );
             },
             width: new ObservableValue(120)
+        },
+        {
+            id: "createdDate",
+            name: "Created Date",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => {
+                const createdDate = item?.fields?.["System.CreatedDate"];
+                return (
+                    <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                        {createdDate ? new Date(createdDate).toLocaleString() : "N/A"}
+                    </SimpleTableCell>
+                );
+            },
+            width: new ObservableValue(150)
+        },
+        {
+            id: "changedDate",
+            name: "Changed Date",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => {
+                const changedDate = item?.fields?.["System.ChangedDate"];
+                return (
+                    <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                        {changedDate ? new Date(changedDate).toLocaleString() : "N/A"}
+                    </SimpleTableCell>
+                );
+            },
+            width: new ObservableValue(150)
+        }
+    ];
+
+    // Iteration table columns
+    const iterationColumns: ITableColumn<any>[] = [
+        {
+            id: "name",
+            name: "Iteration Name",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => (
+                <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                    {item.name}
+                </SimpleTableCell>
+            ),
+            width: new ObservableValue(200)
+        },
+        {
+            id: "startDate",
+            name: "Start Date",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => (
+                <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                    {item.attributes?.startDate ? new Date(item.attributes.startDate).toLocaleDateString() : "N/A"}
+                </SimpleTableCell>
+            ),
+            width: new ObservableValue(120)
+        },
+        {
+            id: "finishDate",
+            name: "End Date",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => (
+                <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                    {item.attributes?.finishDate ? new Date(item.attributes.finishDate).toLocaleDateString() : "N/A"}
+                </SimpleTableCell>
+            ),
+            width: new ObservableValue(120)
+        },
+        {
+            id: "taskCount",
+            name: "# Tasks",
+            renderCell: (rowIndex, columnIndex, tableColumn, item) => (
+                <SimpleTableCell columnIndex={columnIndex} key={`col-${columnIndex}`}>
+                    {iterationTasks[item.id]?.length ?? 0}
+                </SimpleTableCell>
+            ),
+            width: new ObservableValue(80)
         }
     ];
 
@@ -233,6 +348,13 @@ const ExtensionContent: React.FC = () => {
                     <p>Loading all tasks...</p>
                 ) : (
                     <Table columns={columns} itemProvider={new ArrayItemProvider<any>(allTasks)} role="table" />
+                )}
+
+                <h2 style={{ marginTop: "2rem" }}>All Iteration</h2>
+                {loadingIterations ? (
+                    <p>Loading iterations...</p>
+                ) : (
+                    <Table columns={iterationColumns} itemProvider={new ArrayItemProvider<any>(iterations)} role="table" />
                 )}
             </div>
         </Page>
